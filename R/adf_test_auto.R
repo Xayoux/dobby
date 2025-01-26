@@ -31,7 +31,8 @@
 #' # Not needed
 #'
 model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_model, signif, n){
-  # Valeurs critiques à 0.01, 0.05 et 0.1 significativité
+  # Define critical values for 10%, 5% and 1%
+  # Critical values for n > 500
   df_crit_values_inf <-
     data.frame(
       tt = c(3.46, 2.78, 2.38),
@@ -41,6 +42,7 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       phi3 = c(-3.96, -3.41, -3.12) # Modèle avec constante et tendance
     )
 
+  # Critical values for 250 < n <= 500
   df_crit_values_500 <-
     data.frame(
       tt = c(3.48, 2.78, 2.38),
@@ -50,6 +52,7 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       phi3 = c(-3.98, -3.42, -3.13) # Modèle avec constante et tendance
     )
 
+  # Critical values for 100 < n <= 250
   df_crit_values_250 <-
     data.frame(
       tt = c(3.49, 2.79, 2.38),
@@ -59,6 +62,7 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       phi3 = c(-3.99, -3.43, -3.13) # Modèle avec constante et tendance
     )
 
+  # Critical values for <= 100
   df_crit_values_100 <-
     data.frame(
       tt = c(3.53, 2.79, 2.38),
@@ -68,6 +72,7 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       phi3 = c(-4.04, -3.45, -3.15) # Modèle avec constante et tendance
     )
 
+  # Choose the right dataframe to use based on the number of observations
   number_obs <-
     dplyr::case_when(
       n <= 100 ~ "100",
@@ -83,10 +88,12 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       "250" = df_crit_values_250,
       "500" = df_crit_values_500,
       "inf" = df_crit_values_inf,
-    )
-  
+      )
+
+  # Define the number of the column to be used based on the significance level
   index_signif <- ifelse(signif == 0.01, 1, ifelse(signif == 0.05, 2, 3))
 
+  # Define the parameter to be tested based on the model (drift or trend)
   tested_param <-
     switch(
       num_model,
@@ -94,6 +101,7 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       "3" = "tt"
     )
 
+  # Store the critical value for the drift or trend
   crit_value_tested_param <-
     switch(
       num_model,
@@ -101,6 +109,7 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       "3" = df_crit_values[index_signif,"tt"]
     )
 
+  # Define the formula based on the model selected
   model_formula <-
     switch(
       num_model,
@@ -109,39 +118,46 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       "3" = stats::formula("y_diff ~ tt + y_lag_1 + y_diff_lag"),
       )
 
+  # Initiate the final number of lags to lags (for the Fixed case)
   nb_lags_model <- lags
+
+  # If selection not Fixed, then choose the right number of lags by testing them
   if (selectlags != "Fixed"){
-    # Estimer le nombre de lag optimal
     v_criterion <- rep(NA, lags)
     for (lag in 2:lags){
-      y_diff_lag <- x[,2:lag]
+      y_diff_lag <- x[,2:lag] #From 2nd columns, bc the 1st is the diff not lagged
       result <- stats::lm(model_formula)
       v_criterion[lag] <- stats::AIC(result, k = switch(selectlags, AIC = 2, BIC = log(length(y_diff))))
     }
-    nb_lags_model <- which.min(v_criterion)
+    nb_lags_model <- which.min(v_criterion) # Define the number of lags to be used
   }
 
-  # Estimer le modèle
+  # Estimate the real model with the right number of lags
   y_diff_lag <- x[,2:nb_lags_model]
   model_adf <- stats::lm(model_formula)
   summary_model_adf <- summary(model_adf)
 
+  # Intiate the result of the significance test on the tested param on TRUE
+  # Used if model 1 because no param had to be tested
   signif_tested_param <- TRUE
-  
+
+  # If the model has a drift or a trend, test the significance of this param
   if (num_model != "1"){
-    # Tester la significativité du paramètre (tendance ou constante)
     t_stat_tested_param <- summary_model_adf$coefficients[tested_param, "t value"]
 
     signif_tested_param <- (abs(t_stat_tested_param) >= crit_value_tested_param)
   }
 
+  # Intiate results variables in case of the param is not significant
   logical_ur <- NA
   t_stat_phi <- NA
   message_result <- NA
 
+  # If the param is significant then test the unit root
   if (signif_tested_param == TRUE){
     t_stat_phi <- summary_model_adf$coefficients["y_lag_1", "t value"]
 
+    # Select the critical value for the unit root
     crit_value_phi <-
       switch(
         num_model,
@@ -151,17 +167,21 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       )
 
     confidence <- signif * 100
+    # H0 is rejected
     if (t_stat_phi <= crit_value_phi){
       message_result <- glue::glue("H0 is rejected with for {confidence}% confidence. {y_name} serie has no unit root.")
       
       logical_ur <- FALSE
-    } else {
+    }
+    # HO can't be rejected
+    else {
       message_result <- glue::glue("H0 can't be rejected for a {confidence}% confidence. {y_name} serie has at least one unit root.")
 
       logical_ur <- TRUE
     }
   } 
 
+  # Return a list will usefull informations
   return(
     list(
       message_result = message_result,
@@ -295,27 +315,23 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
 #'
 #' @export
 adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "Fixed"), signif = 0.05,
-                         message = TRUE, return_res = TRUE){
-  # Vérifier concordance des paramètres
+                           message = TRUE, return_res = TRUE){
+  # Verify parameters of the functions
   selectlags <- match.arg(selectlags)
 
-  # Vérifier qu'il s'agit bien d'une série univariée
   if (ncol(as.matrix(y)) > 1) 
     stop("\ny is not a vector or univariate time series.\n")
 
-  # Vérifier qu'il n'y a pas de valeurs manquantes
   if (any(is.na(y))) 
     stop("\nNAs in y.\n")
 
-  # Transformer la série en vecteur de numériques
   y <- as.vector(y)
 
-  # Vérifier que lag est un nombre entier positif
   lag <- as.integer(lags)
   if (lag < 0) {
     stop("\nLags must be set to an non negative integer value.\n")
   }
-    
+  
   if (!is.numeric(signif)){
     class_signif <- class(signif)
     stop(glue::glue("signif must be numeric, not {class_signif}"))
@@ -340,17 +356,32 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
     stop(glue::glue("y_name must be character, not {class_y_name}"))
   }
 
-  
-  
-  lags <- lags + 1
-  y_diff <- diff(y)
-  n <- length(y_diff)
-  x <- stats::embed(y_diff, lags)
-  y_diff <- x[, 1]
-  y_lag_1 <- y[lags:n]
-  tt <- lags:n
+  # Prepare the data
+  lags <- lags + 1 # Number of lags + 1 bc the first column is not lagged
+  y_diff <- diff(y) # First difference of the serie
+  n <- length(y_diff) # Number of observations of the first difference
+  x <- stats::embed(y_diff, lags) # Matrix with lagged first difference series
+  y_diff <- x[, 1] # Only the first difference not lagged
+  y_lag_1 <- y[lags:n] # Lag of the serie in level (start at lags bc firsts obs are lost)
+  tt <- lags:n # linear trend
 
-    # Etape 1 : tester la significativité de la tendance
+  # 1) Model with trend and drift
+  test_model <-
+    model_test(
+      y_name = y_name,
+      y_diff = y_diff,
+      tt = tt,
+      y_lag_1 = y_lag_1,
+      x = x,
+      lags = lags,
+      selectlags = selectlags,
+      num_model = "3",
+      signif = signif,
+      n= n
+    )
+
+  # 2) Model with drift and no trend is trend not significant
+  if (test_model$signif_tested_param == FALSE) {
     test_model <-
       model_test(
         y_name = y_name,
@@ -360,12 +391,13 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
         x = x,
         lags = lags,
         selectlags = selectlags,
-        num_model = "3",
+        num_model = "2",
         signif = signif,
-        n= n
+        n = n
       )
 
-    if (test_model$signif_tested_param == FALSE) {
+    # 3) Model with no drift or trend if drift and trend not significant
+    if (test_model$signif_tested_param == FALSE){
       test_model <-
         model_test(
           y_name = y_name,
@@ -375,70 +407,53 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
           x = x,
           lags = lags,
           selectlags = selectlags,
-          num_model = "2",
+          num_model = "1",
           signif = signif,
           n = n
         )
-
-      if (test_model$signif_tested_param == FALSE){
-        test_model <-
-          model_test(
-            y_name = y_name,
-            y_diff = y_diff,
-            tt = tt,
-            y_lag_1 = y_lag_1,
-            x = x,
-            lags = lags,
-            selectlags = selectlags,
-            num_model = "1",
-            signif = signif,
-            n = n
-          )
-      }
     }
-    
+  }
+  
+  # Displya informations on the test results
+  if (message == TRUE){
+    message_test_adf <- glue::glue("# Augmented Dickey-Fuller test for {y_name} serie #")
+    ligne_diez <- strrep("#", nchar(message_test_adf))
 
-    if (message == TRUE){
-      message_test_adf <- glue::glue("# Augmented Dickey-Fuller test for {y_name} serie #")
-      ligne_diez <- strrep("#", nchar(message_test_adf))
-
-      type_model <-
-        switch(
-          test_model$num_model,
-          "1" = "Without drift and trend",
-          "2" = "With drift and without trend",
-          "3" = "With drift and trend"
-        )
-      
-      message(glue::glue("\n\n\n{ligne_diez}\n{message_test_adf}\n{ligne_diez}\n\n"))
-      message(glue::glue("model selected : {type_model}\n\n"))
-      message(glue::glue("Lags number : {test_model$nb_lags_model}\n\n"))
-      message(glue::glue("H0 : {y_name} serie has at least one unit root\n\n"))      
-      message(glue::glue("t stat : {test_model$t_stat_phi}\n\n"))
-
-
-
-      
-      if (test_model$logical_ur == TRUE){
-        cli::cli_alert_danger(test_model$message_result)
-      } else{
-        cli::cli_alert_success(test_model$message_result)
-      }
-      message("\n")
-    }
-
-    df_res_ur <-
-      dplyr::tibble(
-        serie_name = y_name,
-        nb_lags = test_model$nb_lags_model,
-        model = test_model$num_model,
-        has_ur = test_model$logical_ur,
-        phi_stat = test_model$t_stat_phi
+    type_model <-
+      switch(
+        test_model$num_model,
+        "1" = "Without drift and trend",
+        "2" = "With drift and without trend",
+        "3" = "With drift and trend"
       )
+    
+    message(glue::glue("\n\n\n{ligne_diez}\n{message_test_adf}\n{ligne_diez}\n\n"))
+    message(glue::glue("model selected : {type_model}\n\n"))
+    message(glue::glue("Lags number : {test_model$nb_lags_model}\n\n"))
+    message(glue::glue("H0 : {y_name} serie has at least one unit root\n\n"))      
+    message(glue::glue("t stat : {test_model$t_stat_phi}\n\n"))
 
-    if(return_res == TRUE){
-      return(df_res_ur)
+    if (test_model$logical_ur == TRUE){
+      cli::cli_alert_danger(test_model$message_result)
+    } else{
+      cli::cli_alert_success(test_model$message_result)
     }
+    message("\n")
+  }
+
+  # Return if needed tibble with test results
+  df_res_ur <-
+    dplyr::tibble(
+      serie_name = y_name,
+      nb_lags = test_model$nb_lags_model,
+      model = test_model$num_model,
+      has_ur = test_model$logical_ur,
+      phi_stat = test_model$t_stat_phi
+    )
+
+  if(return_res == TRUE){
+    return(df_res_ur)
+  }
 }
 
 
