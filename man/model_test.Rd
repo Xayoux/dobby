@@ -4,7 +4,18 @@
 \alias{model_test}
 \title{Test the Unit root for on ADF model}
 \usage{
-model_test(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_model, signif)
+model_test(
+  y_name,
+  y_diff,
+  tt,
+  y_lag_1,
+  x,
+  lags,
+  selectlags,
+  num_model,
+  signif,
+  n
+)
 }
 \arguments{
 \item{y_name}{String indicating the name of the serie.}
@@ -32,6 +43,8 @@ without trend and drift. "2" for the model with drift and without trend.
 
 \item{signif}{Numeric indicating the significance threshold to be used. Must
 be one of : 0.01, 0.05 or 0.1.}
+
+\item{n}{Numeric indicating the number of observations}
 }
 \value{
 A list containing the message of the result ; a logical indicating

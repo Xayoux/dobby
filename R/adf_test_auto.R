@@ -19,6 +19,8 @@
 #' "3" for the model with drift and trend.
 #' @param signif Numeric indicating the significance threshold to be used. Must
 #' be one of : 0.01, 0.05 or 0.1.
+#' @param n Numeric indicating the number of observations
+#' 
 #' @return A list containing the message of the result ; a logical indicating
 #' if the tested parameter (trend or drift) is significative (always TRUE for
 #' model 1) ; A string indicating the number of the model ; The t-stat of the
@@ -28,15 +30,59 @@
 #' @examples
 #' # Not needed
 #'
-model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_model, signif){
+model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_model, signif, n){
   # Valeurs critiques à 0.01, 0.05 et 0.1 significativité
-  df_crit_values <-
+  df_crit_values_inf <-
     data.frame(
       tt = c(3.46, 2.78, 2.38),
       const = c(3.18, 2.52, 2.16),
       phi1 = c(-2.58, -1.95, -1.62), # modèle sans constante ni tendace
       phi2 = c(-3.43, -2.86, -2.57), # modèle avec constante sans tendance
       phi3 = c(-3.96, -3.41, -3.12) # Modèle avec constante et tendance
+    )
+
+  df_crit_values_500 <-
+    data.frame(
+      tt = c(3.48, 2.78, 2.38),
+      const = c(3.18, 2.52, 2.16),
+      phi1 = c(-2.58, -1.95, -1.62), # modèle sans constante ni tendace
+      phi2 = c(-3.44, -2.87, -2.57), # modèle avec constante sans tendance
+      phi3 = c(-3.98, -3.42, -3.13) # Modèle avec constante et tendance
+    )
+
+  df_crit_values_250 <-
+    data.frame(
+      tt = c(3.49, 2.79, 2.38),
+      const = c(3.19, 2.53, 2.16),
+      phi1 = c(-2.58, -1.95, -1.62), # modèle sans constante ni tendace
+      phi2 = c(-3.46, -2.88, -2.57), # modèle avec constante sans tendance
+      phi3 = c(-3.99, -3.43, -3.13) # Modèle avec constante et tendance
+    )
+
+  df_crit_values_100 <-
+    data.frame(
+      tt = c(3.53, 2.79, 2.38),
+      const = c(3.22, 2.54, 2.17),
+      phi1 = c(-2.60, -1.95, -1.61), # modèle sans constante ni tendace
+      phi2 = c(-3.51, -2.89, -2.58), # modèle avec constante sans tendance
+      phi3 = c(-4.04, -3.45, -3.15) # Modèle avec constante et tendance
+    )
+
+  number_obs <-
+    dplyr::case_when(
+      n <= 100 ~ "100",
+      n <= 250 ~ "250",
+      n <= 500 ~ "500",
+      .default = "inf"
+    )
+
+  df_crit_values <-
+    switch(
+      number_obs,
+      "100" = df_crit_values_100,
+      "250" = df_crit_values_250,
+      "500" = df_crit_values_500,
+      "inf" = df_crit_values_inf,
     )
   
   index_signif <- ifelse(signif == 0.01, 1, ifelse(signif == 0.05, 2, 3))
@@ -315,7 +361,8 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
         lags = lags,
         selectlags = selectlags,
         num_model = "3",
-        signif = signif
+        signif = signif,
+        n= n
       )
 
     if (test_model$signif_tested_param == FALSE) {
@@ -329,7 +376,8 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
           lags = lags,
           selectlags = selectlags,
           num_model = "2",
-          signif = signif
+          signif = signif,
+          n = n
         )
 
       if (test_model$signif_tested_param == FALSE){
@@ -343,7 +391,8 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
             lags = lags,
             selectlags = selectlags,
             num_model = "1",
-            signif = signif
+            signif = signif,
+            n = n
           )
       }
     }
