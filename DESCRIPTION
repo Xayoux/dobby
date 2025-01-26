@@ -11,11 +11,8 @@ RoxygenNote: 7.3.2
 Imports: 
     cli,
     dplyr (>= 1.1.4),
-    glue,
-    lifecycle,
-    rlang,
-    stats (>= 4.4.2),
-    withr
+    glue (>= 1.8.0),
+    stats (>= 4.4.2)
 Suggests: 
     purrr (>= 1.0.2)
 URL: https://github.com/Xayoux/dobby
