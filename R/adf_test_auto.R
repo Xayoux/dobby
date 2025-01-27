@@ -322,8 +322,11 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
   if (ncol(as.matrix(y)) > 1) 
     stop("\ny is not a vector or univariate time series.\n")
 
-  if (any(is.na(y))) 
-    stop("\nNAs in y.\n")
+  # Remove NA if they exists and warn the user
+  if (any(is.na(y))){
+    y <- y[-which(is.na(y))]
+  }
+  warnings("NA's had been removed.")
 
   y <- as.vector(y)
 
