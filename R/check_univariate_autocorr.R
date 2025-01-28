@@ -14,8 +14,8 @@
 #' @param serie_name Character indicating the name of the serie.
 #' @param test_type Character indicating the test to perform. Either "Ljung-Box"
 #' (the default) or "Box-Pierce".
-#' @param n_lag Numeric indicating the number of lags to be used for the second
-#' test.
+#' @param n_lag Numeric (vector) indicating the number of lags to be used for the second
+#' test. If it is a vector, then the test will be done for each lag.
 #' @param print_tests Logical indicating if the results of the tests should be
 #' printed out. True by default.
 #' @param return_output Logical indicating if the graph and the result's tibble
@@ -57,13 +57,14 @@
 #'                                            return_output = FALSE)
 #' )
 #' 
-#' # Return only the res on tibble format
+#' # Return only the res on tibble format and with lag 1 to 20 tested
 #' df_res <-
 #'   purrr::map2(
 #'     list(normal_serie, serie_autocorr),
 #'     c("Normal", "AR(1)"),
 #'     \(serie, name) check_univariate_autocorr(serie, name, test_type = "Box-Pierce",
-#'                                              return_output = FALSE)[["df_res"]]
+#'                                              return_output = FALSE,
+#'                                              n_lag = 1:20)[["df_res"]]
 #'   ) |>
 #'   purrr::list_rbind() |>
 #'   print()
@@ -74,7 +75,7 @@
 #' @export
 check_univariate_autocorr <- function(serie, serie_name,
                                       test_type = c("Ljung-Box", "Box-Pierce"),
-                                      n_lag = 20, print_tests = TRUE,
+                                      n_lag = c(1, 20), print_tests = TRUE,
                                       return_output = TRUE, path_output = NULL){
   # Check if serie is a numeric vector
   dobby::.check_numeric(serie, "serie")
@@ -91,12 +92,9 @@ check_univariate_autocorr <- function(serie, serie_name,
   # Check if n_lag is numeric
   dobby::.check_numeric(n_lag, "n_lag")
 
-  # Check if n_lag is unique
-  dobby::.check_length(n_lag, "n_lag", 1)
-
   # Check if n_lag is positive
-  if (n_lag < 1){
-    stop(glue::glue("n_lag must be > 1, not {n_lag}"))
+  if (TRUE %in% (n_lag < 1)){
+    stop(glue::glue("All elements in n_lag must be > 1."))
   }
 
   # Check if print_tests is logical
@@ -225,8 +223,18 @@ check_univariate_autocorr <- function(serie, serie_name,
   }
 
   # Compute statistical test for 1 and n_lag
-  test_LB_1 <- stats::Box.test(serie, lag = 1, type = test_type)
-  test_LB_n_lag <- stats::Box.test(serie, lag = n_lag, type = test_type)
+  test_autocorr <-
+    purrr::map(
+      n_lag,
+      \(lag) stats::Box.test(serie, lag = lag, type = test_type)
+    )
+
+  # Store p_values
+  p_values_autocorr <-
+    purrr::map_dbl(
+      test_autocorr,
+      \(test) test$p.value
+    )
 
   # Print tests results if needed
   if (print_tests == TRUE){
@@ -235,19 +243,18 @@ check_univariate_autocorr <- function(serie, serie_name,
     message(glue::glue("\n\n\n{ligne_diez}\n{message_test}\n{ligne_diez}\n\n"))
 
     message(glue::glue("H0 : There is no autocorrelation in '{serie_name}' for a given lag number\n\n"))
-    
-    print(test_LB_1)
-    print(test_LB_n_lag)
+
+    print(test_autocorr)
   }
 
   name_test <- ifelse(test_type == "Ljung-Box", "LB", "BP")
 
   # Create a tibble containing pvalues of the tests
-  df_res_LB <-
+  df_res_autocorr <-
     dplyr::tibble(
       serie = serie_name,
-      p_value = c(test_LB_1$p.value, test_LB_n_lag$p.value),
-      lags = c(1, n_lag)
+      p_value = p_values_autocorr,
+      lags = n_lag
     ) |>
     tidyr::pivot_wider(
       names_from = lags,
@@ -260,7 +267,7 @@ check_univariate_autocorr <- function(serie, serie_name,
     return(
       list(
         graph = graph_autocorr,
-        df_res = df_res_LB
+        df_res = df_res_autocorr
       )
     )
   }

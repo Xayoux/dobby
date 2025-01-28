@@ -8,7 +8,7 @@ check_univariate_autocorr(
   serie,
   serie_name,
   test_type = c("Ljung-Box", "Box-Pierce"),
-  n_lag = 20,
+  n_lag = c(1, 20),
   print_tests = TRUE,
   return_output = TRUE,
   path_output = NULL
@@ -22,8 +22,8 @@ check_univariate_autocorr(
 \item{test_type}{Character indicating the test to perform. Either "Ljung-Box"
 (the default) or "Box-Pierce".}
 
-\item{n_lag}{Numeric indicating the number of lags to be used for the second
-test.}
+\item{n_lag}{Numeric (vector) indicating the number of lags to be used for the second
+test. If it is a vector, then the test will be done for each lag.}
 
 \item{print_tests}{Logical indicating if the results of the tests should be
 printed out. True by default.}
@@ -81,13 +81,14 @@ purrr::walk2(
                                            return_output = FALSE)
 )
 
-# Return only the res on tibble format
+# Return only the res on tibble format and with lag 1 to 20 tested
 df_res <-
   purrr::map2(
     list(normal_serie, serie_autocorr),
     c("Normal", "AR(1)"),
     \(serie, name) check_univariate_autocorr(serie, name, test_type = "Box-Pierce",
-                                             return_output = FALSE)[["df_res"]]
+                                             return_output = FALSE,
+                                             n_lag = 1:20)[["df_res"]]
   ) |>
   purrr::list_rbind() |>
   print()
