@@ -69,7 +69,9 @@ check_univariate_normality(
 
 }
 \seealso{
-\code{\link[moments]{agostino.test}} pour the Agostino's skewness test.
-\code{\link[moments]{anscombe.test}} pour the Anscombe's kurtosis test.
-\code{\link[moments]{jarque.test}} pour the Jarque-Berra's normality test.
+\itemize{
+\item \code{\link[moments]{agostino.test}}() For the Agostino's skewness test.
+\item \code{\link[moments]{anscombe.test}}() For the Anscombe's kurtosis test.
+\item \code{\link[moments]{jarque.test}}() For the Jarque-Berra's normality test.
+}
 }

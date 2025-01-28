@@ -47,9 +47,11 @@
 #' )
 #'
 #' @seealso
-#' \code{\link[moments]{agostino.test}} pour the Agostino's skewness test.
-#' \code{\link[moments]{anscombe.test}} pour the Anscombe's kurtosis test.
-#' \code{\link[moments]{jarque.test}} pour the Jarque-Berra's normality test.
+#' - \code{\link[moments]{agostino.test}}() For the Agostino's skewness test.
+#' 
+#' - \code{\link[moments]{anscombe.test}}() For the Anscombe's kurtosis test.
+#' 
+#' - \code{\link[moments]{jarque.test}}() For the Jarque-Berra's normality test.
 #' 
 #' @export
 check_univariate_normality <- function(serie, name, print_tests = TRUE,
