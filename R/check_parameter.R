@@ -83,6 +83,20 @@
 }
 
 
+#' @title Check if parameter is a data.frame
+#'
+#' @param param Value of the parameter
+#' @param name_param Character indicating the name of the parameter
+#' @return Stop or nothing
+#' @export
+.check_data_frame <- function(param, name_param){
+  if(!is.data.frame(param)){
+    class_param <- class(param)
+    stop(glue::glue("{name_param} must be a data.frame, not a {class_param}."))
+  }
+}
+
+
 # Check length of parameter -------------------------------------------------
 #' @title Check if Parameter is Length 1
 #'
