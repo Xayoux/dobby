@@ -25,6 +25,12 @@
 #' It must be equal or greater than nb_min_obs.
 #' @param nb_min_obs Numeric indicating the minimal number of observation the
 #' window must have before the VAR is computed.
+#' @param set_seed Logical indicating whether a seed should be set to always
+#' obtain same random numbers. TRUE by default. The seed generation is from the
+#' "L'Ecuyer-CMRG" algorithm. See \code{\link[base]{set.seed}}() and
+#' \code{\link[furrr]{furrr_options}}().
+#' @param seed Numeric indicating the seed number to be used.
+#' 
 #' @return A tibble with 5 columns :
 #' - date : Latest date of the window (only if "Moving")
 #' - cause : the name of the variable causing the others
@@ -101,18 +107,24 @@
 #' )
 #'
 #' @seealso
-#' \code{\link[vars]{VARselect}}() For more informations on lags selection.
-#' \code{\link[vars]{causality}}() For more informations on Granger test.
+#' - \code{\link[vars]{VARselect}}() For more informations on lags selection.
+#' 
+#' - \code{\link[vars]{causality}}() For more informations on Granger test.
+#' 
+#' - \code{\link[base]{set.seed}}() For more informations on random numbers
+#' 
+#' - \code{\link[furrr]{furrr_options}}()
 #'
 #' @export
 granger_causality <- function(df, variables,
-                                   selectlag = c("Moving", "Fixed"),
-                                   ic = c("AIC", "HQ", "SC", "FPE"),
-                                   boot = TRUE, boot.runs = 100,
-                                   type = c("Moving", "None"),
-                                   window = integer(0),
-                                   nb_min_obs = 520
-                                   ){
+                              selectlag = c("Moving", "Fixed"),
+                              ic = c("AIC", "HQ", "SC", "FPE"),
+                              boot = TRUE, boot.runs = 100,
+                              type = c("Moving", "None"),
+                              window = integer(0),
+                              nb_min_obs = 520, set_seed = TRUE,
+                              seed = 1234567
+                              ){
   # Check that arguments are matching
   ic <- match.arg(ic)
   type <- match.arg(type)
@@ -164,6 +176,23 @@ granger_causality <- function(df, variables,
     if (window < nb_min_obs){
       stop("window must be >= nb_min_obs")
     }
+  }
+
+  # Check if set_seed is logical
+  dobby::.check_logical(set_seed, "set_seed")
+
+  # Check if set_seed is unique
+  dobby::.check_length(set_seed, "set_seed", 1)
+
+  # Check if seed is numeric
+  dobby::.check_numeric(seed, "seed")
+
+  # Check if seed is unique
+  dobby::.check_length(seed, "seed", 1)
+
+  # Seet seed if needed
+  if (set_seed == TRUE){
+    set.seed(seed, kind = "L'Ecuyer-CMRG")
   }
   
   # Select only wanted variables and dates

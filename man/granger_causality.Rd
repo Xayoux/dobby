@@ -13,7 +13,9 @@ granger_causality(
   boot.runs = 100,
   type = c("Moving", "None"),
   window = integer(0),
-  nb_min_obs = 520
+  nb_min_obs = 520,
+  set_seed = TRUE,
+  seed = 1234567
 )
 }
 \arguments{
@@ -46,6 +48,13 @@ It must be equal or greater than nb_min_obs.}
 
 \item{nb_min_obs}{Numeric indicating the minimal number of observation the
 window must have before the VAR is computed.}
+
+\item{set_seed}{Logical indicating whether a seed should be set to always
+obtain same random numbers. TRUE by default. The seed generation is from the
+"L'Ecuyer-CMRG" algorithm. See \code{\link[base]{set.seed}}() and
+\code{\link[furrr]{furrr_options}}().}
+
+\item{seed}{Numeric indicating the seed number to be used.}
 }
 \value{
 A tibble with 5 columns :
@@ -131,6 +140,10 @@ purrr::map(
 
 }
 \seealso{
-\code{\link[vars]{VARselect}}() For more informations on lags selection.
-\code{\link[vars]{causality}}() For more informations on Granger test.
+\itemize{
+\item \code{\link[vars]{VARselect}}() For more informations on lags selection.
+\item \code{\link[vars]{causality}}() For more informations on Granger test.
+\item \code{\link[base]{set.seed}}() For more informations on random numbers
+\item \code{\link[furrr]{furrr_options}}()
+}
 }
