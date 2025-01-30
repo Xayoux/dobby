@@ -1,3 +1,62 @@
+rolling_granger <- function(df, endog_var, exog_var, selectlag, ic, lags, boot, boot.runs, lag_max,
+                            set_seed, seed){
+  # Seet seed if needed
+  if (set_seed == TRUE){
+    set.seed(seed, kind = "L'Ecuyer-CMRG")
+  }
+  # Minimal number of observations for computing the VAR
+  nb_obs_min <-
+    df |>
+    dplyr::pull(obs) |>
+    unique()
+
+  # Compute only if there is a sufficient number of obs
+  if (nrow(df) >= nb_obs_min){
+    date <-
+      df |>
+      dplyr::filter(dplyr::row_number() == max(dplyr::row_number())) |>
+      dplyr::select(date)
+
+    df_endog <-
+      df |>
+      dplyr::select(dplyr::all_of(endog_var))
+
+    if (!is.null(exog_var)){
+      df_exog <-
+        df |>
+        dplyr::select(dplyr::all_of(exog_var))
+    } else {
+      df_exog <- NULL
+    }
+    
+
+    # Restimate the number of lags for each period if wanted
+    if (selectlag == "Moving"){
+      n_lag <- vars::VARselect(df_endog, lag.max = lag_max, exogen = df_exog)$selection[ic]
+    } else {
+      n_lag <- lags # Fixed lags
+    }
+    
+    VAR <- vars::VAR(y = df_endog, p = n_lag, exogen = df_exog)
+
+    # Granger test for each cause
+    p_value_granger_reccursive <-
+      purrr::map_dbl(
+        endog_var,
+        \(cause) vars::causality(VAR, cause = cause,
+                                 boot = boot, boot.runs = boot.runs)$Granger$p.value
+      ) |>
+      dplyr::as_tibble()  |>
+      dplyr::mutate(
+        cause = endog_var
+      ) |>
+      dplyr::rename(p_value = value) |>
+      dplyr::bind_cols(date) |>
+      dplyr::relocate(date, cause)
+  }
+}
+
+
 #' Perform a causality granger causality test 
 #'
 #' The test is conducted on the full sample, but can also be conducted on
@@ -5,11 +64,15 @@
 #' a Granger test is  : the variable X do not Granger cause the variable Y.
 #' 
 #' @param df Dataframe containing all variables and a "date" variable.
-#' @param variables Character vector containing the name of variables to be used
-#' in the VAR
+#' @param endog_var Character vector containing the names of endogenous
+#' variables.
+#' @param exog_var Character vector containing the names of exogeneous
+#' variables.
 #' @param selectlag Character indicating if the number of lags for the VAR
 #' should be reestimated each period ("Moving") or not ("Fixed"). By default
 #' "Moving". Usefull only if `type == "Moving"`.
+#' @param lag_max Numeric indicating the maximum number of lags to be tested
+#' for the VAR.
 #' @param ic Name of the information criterion used to determine the optimal
 #' number of lags. Either "AIC" (the default), "HQ", "SC" or "FPE". See
 #' \code{\link[vars]{VARselect}}() for more informations. 
@@ -76,7 +139,7 @@
 #' # Granger causality on full sample with X and Y. No bootstrap.
 #' granger_causality(
 #'   df = data,
-#'   variables = c("X", "Y"),
+#'   endog_var = c("X", "Y"),
 #'   ic = "AIC",
 #'   boot = FALSE,
 #'   type = "None"
@@ -85,11 +148,12 @@
 #' # Granger causality reccursive with X, Y, Z. Bootstrap.
 #' granger_causality(
 #'   df = data,
-#'   variables = c("X", "Z", "Y"),
+#'   endog_var = c("X", "Z", "Y"),
 #'   ic = "AIC",
 #'   boot = TRUE,
 #'   type = "Moving",
-#'   nb_min_obs = 50
+#'   nb_min_obs = 50,
+#'   lag_max = 10
 #' )
 #' 
 #' # Granger causality with XY and XZ. moving window of 50
@@ -97,13 +161,27 @@
 #'   list(c("X", "Y"), c("X", "Z")),
 #'   \(var_names) granger_causality(
 #'     df = data,
-#'     variables = var_names,
+#'     endog_var = var_names,
 #'     ic = "HQ",
 #'     boot = FALSE,
 #'     type = "Moving",
 #'     window = 50,
-#'     nb_min_obs = 50
+#'     nb_min_obs = 50,
+#'     lag_max = 10
 #'   )
+#' )
+#' 
+#' # Granger causality between X and Y with Z as an exogen variable
+#' granger_causality(
+#'   df = data,
+#'   endog_var = c("X", "Y"),
+#'   exog_var = c("Z"),
+#'   ic = "AIC",
+#'   boot = FALSE,
+#'   type = "Moving",
+#'   window = 50,
+#'   nb_min_obs = 50,
+#'   lag_max = 10
 #' )
 #'
 #' @seealso
@@ -116,9 +194,10 @@
 #' - \code{\link[furrr]{furrr_options}}()
 #'
 #' @export
-granger_causality <- function(df, variables,
+granger_causality <- function(df, endog_var, exog_var = NULL,
                               selectlag = c("Moving", "Fixed"),
                               ic = c("AIC", "HQ", "SC", "FPE"),
+                              lag_max = 20,
                               boot = TRUE, boot.runs = 100,
                               type = c("Moving", "None"),
                               window = integer(0),
@@ -132,6 +211,12 @@ granger_causality <- function(df, variables,
 
   # Check if df is a dataframe
   dobby::.check_data_frame(df, "df")
+
+  # Check if lag_max is numeric
+  dobby::.check_numeric(lag_max, "lag_max")
+
+  # Check if lag_max is unique
+  dobby::.check_length(lag_max, "lag_max", 1)
 
   # Check if boot is logical
   dobby::.check_logical(boot, "boot")
@@ -196,6 +281,7 @@ granger_causality <- function(df, variables,
   }
   
   # Select only wanted variables and dates
+  variables <- c(endog_var, exog_var)
   df <-
     df |>
     dplyr::select(dplyr::all_of(variables), date) |>
@@ -205,28 +291,37 @@ granger_causality <- function(df, variables,
     dplyr::mutate(obs = nb_min_obs) 
 
   # Df used for the computation of the VAR (Remove dates)
-  df_granger <-
+  df_endog <-
     df |>
-    dplyr::select(!c(date, obs))
+    dplyr::select(dplyr::all_of(endog_var))
+
+  if (!is.null(exog_var)){
+    df_exog <-
+      df |>
+      dplyr::select(dplyr::all_of(exog_var))
+  } else {
+    df_exog <- NULL
+  }
+  
 
   # Select the number of lags for the full VAR
   ic <- glue::glue("{ic}(n)")
-  lags <- vars::VARselect(df_granger, lag.max = 20)$selection[ic]
+  lags <- vars::VARselect(df_endog, lag.max = lag_max, exogen = df_exog)$selection[ic]
 
   # Perform the FULL VAR
-  var <- vars::VAR(df_granger, p = lags)
+  var <- vars::VAR(df_endog, p = lags, exogen = df_exog)
 
   # Granger test with each variable as a cause
   # Return a dataframe with one row per variable
   p_value_granger_full <-
     purrr::map_dbl(
-      variables,
+      endog_var,
       \(cause) vars::causality(var, cause = cause,
                                boot = boot, boot.runs = boot.runs)$Granger$p.value
     ) |>
     dplyr::as_tibble()  |>
     dplyr::mutate(
-      cause = variables
+      cause = endog_var
     ) |>
     dplyr::rename(p_value_full = value)
 
@@ -237,49 +332,10 @@ granger_causality <- function(df, variables,
       runner::runner(
         x = df,
         k = window,
-        f = function(df){
-          # Minimal number of observations for computing the VAR
-          nb_obs_min <-
-            df |>
-            dplyr::pull(obs) |>
-            unique()
-
-          # Compute only if there is a sufficient number of obs
-          if (nrow(df) >= nb_obs_min){
-            date <-
-              df |>
-              dplyr::filter(dplyr::row_number() == max(dplyr::row_number())) |>
-              dplyr::select(date)
-
-            df <-
-              df |>
-              dplyr::select(!c(date, obs))
-
-            # Restimate the number of lags for each period if wanted
-            if (selectlag == "Moving"){
-              n_lag <- vars::VARselect(df)$selection[ic]
-            } else {
-              n_lag <- lags # Fixed lags
-            }
-            
-            var <- vars::VAR(y = df, p = n_lag)
-
-            # Granger test for each cause
-            p_value_granger_reccursive <-
-              purrr::map_dbl(
-                variables,
-                \(cause) vars::causality(var, cause = cause,
-                                         boot = boot, boot.runs = boot.runs)$Granger$p.value
-              ) |>
-              dplyr::as_tibble()  |>
-              dplyr::mutate(
-                cause = variables
-              ) |>
-              dplyr::rename(p_value = value) |>
-              dplyr::bind_cols(date) |>
-              dplyr::relocate(date, cause)
-          }
-        }
+        f = \(df) rolling_granger(df, endog_var = endog_var, exog_var = exog_var,
+                                  selectlag = selectlag, ic = ic, lags = lags,
+                                  boot = boot, boot.runs = boot.runs, lag_max = lag_max,
+                                  set_seed = set_seed, seed = seed)
       ) |>
   purrr::list_rbind()
 
@@ -300,7 +356,7 @@ granger_causality <- function(df, variables,
   df_res <-
     df_res |>
     dplyr::mutate(
-      information = paste(variables, collapse = " / ")
+      information = paste(endog_var, collapse = " / ")
     )
   
   return(df_res)

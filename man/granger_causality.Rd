@@ -6,9 +6,11 @@
 \usage{
 granger_causality(
   df,
-  variables,
+  endog_var,
+  exog_var = NULL,
   selectlag = c("Moving", "Fixed"),
   ic = c("AIC", "HQ", "SC", "FPE"),
+  lag_max = 20,
   boot = TRUE,
   boot.runs = 100,
   type = c("Moving", "None"),
@@ -21,8 +23,11 @@ granger_causality(
 \arguments{
 \item{df}{Dataframe containing all variables and a "date" variable.}
 
-\item{variables}{Character vector containing the name of variables to be used
-in the VAR}
+\item{endog_var}{Character vector containing the names of endogenous
+variables.}
+
+\item{exog_var}{Character vector containing the names of exogeneous
+variables.}
 
 \item{selectlag}{Character indicating if the number of lags for the VAR
 should be reestimated each period ("Moving") or not ("Fixed"). By default
@@ -31,6 +36,9 @@ should be reestimated each period ("Moving") or not ("Fixed"). By default
 \item{ic}{Name of the information criterion used to determine the optimal
 number of lags. Either "AIC" (the default), "HQ", "SC" or "FPE". See
 \code{\link[vars]{VARselect}}() for more informations.}
+
+\item{lag_max}{Numeric indicating the maximum number of lags to be tested
+for the VAR.}
 
 \item{boot}{Logical indicating if critical values should be computed by
 bootstrap or not. TRUE by default. See \code{\link[vars]{causality}}() for
@@ -108,7 +116,7 @@ data <-
 # Granger causality on full sample with X and Y. No bootstrap.
 granger_causality(
   df = data,
-  variables = c("X", "Y"),
+  endog_var = c("X", "Y"),
   ic = "AIC",
   boot = FALSE,
   type = "None"
@@ -117,11 +125,12 @@ granger_causality(
 # Granger causality reccursive with X, Y, Z. Bootstrap.
 granger_causality(
   df = data,
-  variables = c("X", "Z", "Y"),
+  endog_var = c("X", "Z", "Y"),
   ic = "AIC",
   boot = TRUE,
   type = "Moving",
-  nb_min_obs = 50
+  nb_min_obs = 50,
+  lag_max = 10
 )
 
 # Granger causality with XY and XZ. moving window of 50
@@ -129,13 +138,27 @@ purrr::map(
   list(c("X", "Y"), c("X", "Z")),
   \(var_names) granger_causality(
     df = data,
-    variables = var_names,
+    endog_var = var_names,
     ic = "HQ",
     boot = FALSE,
     type = "Moving",
     window = 50,
-    nb_min_obs = 50
+    nb_min_obs = 50,
+    lag_max = 10
   )
+)
+
+# Granger causality between X and Y with Z as an exogen variable
+granger_causality(
+  df = data,
+  endog_var = c("X", "Y"),
+  exog_var = c("Z"),
+  ic = "AIC",
+  boot = FALSE,
+  type = "Moving",
+  window = 50,
+  nb_min_obs = 50,
+  lag_max = 10
 )
 
 }
