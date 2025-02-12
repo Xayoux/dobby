@@ -31,7 +31,7 @@
 #' # Not needed
 #'
 model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_model, signif, n){
-  # Define critical values for 10%, 5% and 1%
+  # Define critical values for 1%, 5% and 10%
   # Critical values for n > 500
   df_crit_values_inf <-
     data.frame(
