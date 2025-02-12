@@ -90,6 +90,8 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       "inf" = df_crit_values_inf,
       )
 
+  crit_value_phi <- NULL
+
   # Define the number of the column to be used based on the significance level
   index_signif <- ifelse(signif == 0.01, 1, ifelse(signif == 0.05, 2, 3))
 
@@ -179,7 +181,11 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
 
       logical_ur <- TRUE
     }
-  } 
+  }
+
+  if (is.null(crit_value_phi)) {
+    crit_value_phi <- NA
+  }
 
   # Return a list will usefull informations
   return(
@@ -189,7 +195,8 @@ model_test <- function(y_name, y_diff, tt, y_lag_1, x, lags, selectlags, num_mod
       logical_ur = logical_ur,
       num_model = num_model,
       t_stat_phi = t_stat_phi,
-      nb_lags_model = (nb_lags_model - 1)
+      nb_lags_model = (nb_lags_model - 1),
+      crit_value_phi = crit_value_phi
     )
   )
 }
@@ -451,7 +458,8 @@ adf_test_auto <- function (y, y_name, lags = 20, selectlags = c("AIC", "BIC", "F
       nb_lags = test_model$nb_lags_model,
       model = test_model$num_model,
       has_ur = test_model$logical_ur,
-      phi_stat = test_model$t_stat_phi
+      phi_stat = test_model$t_stat_phi,
+      phi_crit = test_model$crit_value_phi
     )
 
   if(return_res == TRUE){
