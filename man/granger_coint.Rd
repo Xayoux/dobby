@@ -2,11 +2,12 @@
 % Please edit documentation in R/granger_coint.R
 \name{granger_coint}
 \alias{granger_coint}
-\title{Perform a cointegration granger test}
+\title{Perform a cointegration granger test with moving sample}
 \usage{
 granger_coint(
   df,
   formula,
+  signif = 0.05,
   type = c("Moving", "None"),
   window = integer(0),
   nb_min_obs = 520,
@@ -15,10 +16,13 @@ granger_coint(
 )
 }
 \arguments{
-\item{df}{Dataframe cointaing data and a "date" variable.}
+\item{df}{Dataframe containing the data and a "date" variable.}
 
 \item{formula}{Character or formula indicating the formula of the
 long-term regression.}
+
+\item{signif}{Numeric indicating the level of significance. Can be, 0.01,
+0.05 (the default) or 0.1.}
 
 \item{type}{Character indicating if the granger tests should be condcuted
 in a "Moving way" (either reccursive if \code{window = 0} or rolling if
@@ -42,12 +46,78 @@ A tibble containing results of rolling and full sample test
 (statistical values and critical values).
 }
 \description{
-The test is conducted on the full sample, but can also be conducted on
-a rolling window or reccursive way. A long term regression is run with the
-formula provided. An ADF test (see \code{\link[dobby]{adf_test_auto}}()) is
-then conducted on the residuals. Is there is no unit root, then the series
-are said to be cointegrated.
+The Granger cointegration test is a statistical test that can
+be conducted to tests whether two time series share the same stochastic long
+term trend not. If this is the case these two series are said to be
+cointegrated.
+
+The Granger cointegration test has two steps :
+\itemize{
+\item Estimate a linear regression between a serie \eqn{Y_t} and a serie \eqn{X_t}
+(both series are non-stationnary)
+so that : \eqn{Y_t = \alpha + \beta X_t + \epsilon_t}.
+\item Take the serie of estimated residuals : \eqn{\hat{\epsilon}_t} and
+perform a Unit root test on this serie (see
+\code{\link[dobby]{adf_test_auto}}()) for more informations on the ADF test).
+}
+
+If there is no Unit Root is the residuals serie, then \eqn{Y_t} and \eqn{X_t}
+are said to be cointegrated. (Reminder that the null hypothesis for the ADF
+test is the presence of at least one unit root in the serie).
+
+This function allow to perform the Granger cointegration test on the full
+sample, but also on a moving sample (in a recursive or moving window way).
 }
 \examples{
-# No examples yet
+set.seed(123456)
+# Create 2 series
+n <- 300
+
+# Random walk
+X <- cumsum(rnorm(n))
+
+# Add a white noise to the serie X
+Y <- X + rnorm(n, sd = 0.5)
+
+# Another random walk
+Z <- cumsum(rnorm(n))
+
+data <-
+  dplyr::tibble(
+    date = 1:n,
+    X = X,
+    Y = Y,
+    Z = Z
+  )
+
+# Test the cointegration between X and Y on the full sample and with 1\%
+# of significance
+granger_coint(
+  df = data,
+  formula = "X ~ Y",
+  type = "None",
+  signif = 0.01
+)
+
+# Test the cointegration between X and Z with in a recursive way
+granger_coint(
+  df = data,
+  formula = as.formula("X ~ Z"),
+  type = "Moving",
+  nb_min_obs = 100
+)
+
+# Test cointegration between X and Y then between X and Z in a moving window
+# of 100 obs
+purrr::map(
+  list("X ~ Y", "X ~ Z"),
+  \(LT_formula) granger_coint(
+    df = data,
+    formula = LT_formula,
+    type = "Moving",
+    window = 100,
+    nb_min_obs = 100
+  )
+) |>
+  purrr::list_rbind()
 }
